@@ -10,7 +10,7 @@ import './body.html';
 
 
 var username='';
-var runObserveFlag=false;
+//var runObserveFlag=false;
 function showOnMap(results,map) {
 
   for (var i = 0; i < results.length; i++) {
@@ -32,31 +32,33 @@ function showOnMap(results,map) {
 
 Template.body.onCreated(function bodyOnCreated() {
   this.state = new ReactiveDict();
-  Meteor.subscribe('tasks');
   Meteor.subscribe('mapItems');
 
 
    //$.getScript("/package/markerwithlabel.js");
-   $.getScript("http://google-maps-utility-library-v3.googlecode.com/svn/trunk/markerwithlabel/src/markerwithlabel.js",function( data, textStatus, jqxhr ) {
 
-     GoogleMaps.ready('exampleMap', function(map) {
+   GoogleMaps.ready('exampleMap', function(map) {
 
-      var results = MapItems.find({}).fetch();
+    $.getScript("http://google-maps-utility-library-v3.googlecode.com/svn/trunk/markerwithlabel/src/markerwithlabel.js",function( data, textStatus, jqxhr ) {
       showOnMap(results,map);
-      google.maps.event.addListener(map.instance, "click", function(event) {
-        if (! Meteor.userId()) {
-          bootbox.prompt("What is your name?", function(result) {
-            if (result !== null) {
-              username=result;
-              instertMarker(username,event.latLng.lat(),event.latLng.lng());
-            }
-          });
+    });
 
-        }else{
-          username=Meteor.user().username;
-          instertMarker(username,event.latLng.lat(),event.latLng.lng());
-        }
-      });
+    var results = MapItems.find({}).fetch();
+
+    google.maps.event.addListener(map.instance, "click", function(event) {
+      if (! Meteor.userId()) {
+        console.log('show------------');
+        bootbox.prompt("What is your name?", function(result) {
+          if (result !== null) {
+            username=result;
+            instertMarker(username,event.latLng.lat(),event.latLng.lng());
+          }
+        });
+
+      }else{
+        username=Meteor.user().username;
+        instertMarker(username,event.latLng.lat(),event.latLng.lng());
+      }
     });
   });
 });
@@ -64,25 +66,13 @@ Template.body.onCreated(function bodyOnCreated() {
 
 function instertMarker(username,lat,lng){
   if(username!==''&&username!==null){
-    runObserveFlag=true;
+   // runObserveFlag=true;
     Meteor.call('mapitems.insert',lat,lng,username);
   }
 }
 
 Template.body.helpers({
-  tasks() {
-   const instance = Template.instance();
-   if (instance.state.get('hideCompleted')) {
-      // If hide completed is checked, filter tasks
-      return Tasks.find({ checked: { $ne: true } }, { sort: { createdAt: -1 } });
-    }
-    // Otherwise, return all of the tasks
-    return Tasks.find({}, { sort: { createdAt: -1 } });
-  },
 
-  incompleteCount() {
-    return Tasks.find({ checked: { $ne: true } }).count();
-  },
 
   exampleMapOptions: function() {
     // Make sure the maps API has loaded
@@ -98,24 +88,10 @@ Template.body.helpers({
 
 });
 
- var markers={};
 
-
-MapItems.find().observe({
-added: function(document) {
-    // Create a marker for this document
-     if(!runObserveFlag) return;
-     runObserveFlag=false;
-    var pinImage = new google.maps.MarkerImage("/images/newer-marker.png",
-        null,
-        null,
-        null,
-        new google.maps.Size(40, 40)
-
-      );
-
-    var marker = new MarkerWithLabel({
-      draggable: true,
+function createMarker(dragValue,pinImage,username){
+   var marker = new MarkerWithLabel({
+      draggable: dragValue,
       animation: google.maps.Animation.DROP,
       position: new google.maps.LatLng(document.lat, document.lng),
       map: GoogleMaps.maps.exampleMap.instance,
@@ -129,12 +105,60 @@ added: function(document) {
       id: document._id
     });
 
+   return marker;
+}
+
+ var markers={};
+MapItems.find().observe({
+added: function(document) {
+    // Create a marker for this document
+     // if(!runObserveFlag) return;
+     // runObserveFlag=false;
+    var userImage = new google.maps.MarkerImage("/images/newer-marker.png",
+        null,
+        null,
+        null,
+        new google.maps.Size(40, 40)
+
+      );
+
+    var otherUserImage = new google.maps.MarkerImage("/images/othersNewMarker.png",
+        null,
+        null,
+        null,
+        new google.maps.Size(25, 40)
+
+      );
+    console.log('-----------1.1');
+    var tempMarker=MapItems.findOne({_id:document._id});
+
+    var marker = new MarkerWithLabel({
+      draggable: true,
+      animation: google.maps.Animation.DROP,
+      position: new google.maps.LatLng(document.lat, document.lng),
+      map: GoogleMaps.maps.exampleMap.instance,
+      icon: userImage,
+      labelContent: tempMarker.username,
+      labelAnchor: new google.maps.Point(15, 65),
+      labelClass: "markerLabel", // the CSS class for the label
+      labelInBackground: false,
+      // We store the document _id on the marker in order
+      // to update the document within the 'dragend' event below.
+      id: document._id
+    });
+
+    // console.log('---------1--------');
+     if(tempMarker.username!==username){
+
+    //   console.log('---------3--------');
+       marker.setDraggable(false);
+       marker.setIcon(otherUserImage);
+     }
+
+
     // This listener lets us drag markers on the map and update their corresponding document.
     google.maps.event.addListener(marker, 'dragend', function(event) {
-
-     Meteor.call('mapitems.update',marker.id,event.latLng.lat(),event.latLng.lng());
-    //  MapItems.update(marker.id, { $set: { lat: event.latLng.lat(), lng: event.latLng.lng() }});
-
+       Meteor.call('mapitems.update',marker.id,event.latLng.lat(),event.latLng.lng());
     });
 
     // Store this marker instance within the markers object.
@@ -166,15 +190,6 @@ Template.body.events({
     const target = event.target;
     const text = target.text.value;
 
-    Meteor.call('tasks.insert', text);
-
-    // Insert a task into the collection
-    Tasks.insert({
-      text,
-      createdAt: new Date(), // current time
-      owner: Meteor.userId(),
-      username: Meteor.user().username
-    });
 
     // Clear form
     target.text.value = '';
