@@ -25,4 +25,5 @@ aldeed:simple-schema
 
 dburles:google-maps
 
-insecure
+mizzao:bootboxjs
+twbs:bootstrap

@@ -8,7 +8,9 @@ export const MapItems = new Mongo.Collection('mapitems');
 
 MapItems.schema = new SimpleSchema({
   lat: { type: [Number] },
-  lng: { type: [Number] }
+  lng: { type: [Number] },
+  username:{type: [String]}
+
 });
 
 
@@ -30,6 +32,19 @@ if (Meteor.isServer) {
 }
 
 Meteor.methods({
+
+  'mapitems.insert'(lat,lng,username){
+    check(lat,Number);
+    check(lng,Number);
+
+     MapItems.insert({ lat: lat, lng: lng, username:username });
+  },
+
+  'mapitems.update'(makerId,lat,lng){
+
+      MapItems.update(makerId, { $set: { lat: lat, lng: lng }});
+  },
+
   'tasks.insert'(text) {
     check(text, String);
 
